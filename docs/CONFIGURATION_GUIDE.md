@@ -1,27 +1,27 @@
-# Configuration Guide
+# 配置指南
 
-The ValueCell project uses a **three-tier configuration system** to enable flexible deployment from development to production. This guide covers all aspects of configuring agents, providers, and models.
+ValueCell 项目使用**三层配置系统**，支持从开发到生产的灵活部署。本指南涵盖配置代理、提供商和模型的所有方面。
 
-## Configuration Priority
+## 配置优先级
 
-ValueCell resolves configuration from multiple sources in this order (highest to lowest priority):
+ValueCell 按以下顺序（从高到低）解析多个配置源：
 
-1. **Environment Variables** - Runtime overrides (e.g., `OPENROUTER_API_KEY`)
-2. **.env File** - User-level configuration (in project root)
-3. **YAML Files** - System defaults (in `python/configs/`)
+1. **环境变量** - 运行时覆盖（例如，`OPENROUTER_API_KEY`）
+2. **.env 文件** - 用户级配置（在项目根目录）
+3. **YAML 文件** - 系统默认值（在 `python/configs/` 中）
 
-This hierarchy allows you to:
-- Set provider credentials via `.env` without modifying code
-- Override settings at runtime via environment variables
-- Maintain sensible defaults in YAML files
+此层次结构允许您：
+- 通过 `.env` 设置提供商凭证，无需修改代码
+- 通过环境变量在运行时覆盖设置
+- 在 YAML 文件中维护合理的默认值
 
-## Quick Start
+## 快速开始
 
-### Step 1: Get API Keys
+### 步骤 1：获取 API 密钥
 
-ValueCell supports multiple LLM providers. Choose at least one:
+ValueCell 支持多个 LLM 提供商。至少选择一个：
 
-| Provider        | Sign Up                                             |
+| 提供商        | 注册地址                                             |
 | --------------- | --------------------------------------------------- |
 | **OpenRouter**  | [openrouter.ai](https://openrouter.ai/)             |
 | **SiliconFlow** | [siliconflow.cn](https://www.siliconflow.cn/)       |
@@ -29,25 +29,27 @@ ValueCell supports multiple LLM providers. Choose at least one:
 | **OpenAI**      | [platform.openai.com](https://platform.openai.com/) |
 | **DashScope**   | [bailian.console.aliyun.com](https://bailian.console.aliyun.com/#/home) |
 
-### Step 2: Configure .env File
+### 步骤 2：配置 .env 文件
 
-Copy the example file and add your API keys:
-Edit `.env` and add your credentials:
+复制示例文件并添加您的 API 密钥：
+编辑 `.env` 并添加您的凭证：
 
-# In project root
+```bash
+# 在项目根目录
 cp .env.example .env
 
-# Or SiliconFlow (best for Chinese models and cost)
-Edit `.env` and add your credentials:
+# 或使用 SiliconFlow（最适合中文模型和成本）
+# 编辑 `.env` 并添加您的凭证：
+SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxx
 
-# Or Google Gemini
+# 或使用 Google Gemini
 GOOGLE_API_KEY=AIzaSyDxxxxxxxxxxxxx
 
-# Optional: Set primary provider (auto-detected if not set)
+# 可选：设置主提供商（如果未设置则自动检测）
 PRIMARY_PROVIDER=openrouter
 ```
 
-### Step 3: Launch Application
+### 步骤 3：启动应用程序
 
 ```bash
 # macOS / Linux
@@ -57,68 +59,68 @@ bash start.sh
 .\start.ps1
 ```
 
-The system will auto-detect available providers based on configured API keys.
+系统将根据配置的 API 密钥自动检测可用的提供商。
 
-> **Note**: If you get database compatibility errors, delete these locations:
-> - LanceDB directory (system application directory, same as `.env`):
+> **注意**：如果遇到数据库兼容性错误，请删除以下位置：
+> - LanceDB 目录（系统应用程序目录，与 `.env` 相同）：
 >   - macOS: `~/Library/Application Support/ValueCell/lancedb`
 >   - Linux: `~/.config/valuecell/lancedb`
 >   - Windows: `%APPDATA%\\ValueCell\\lancedb`
-> - Knowledge directory (system application directory, same as `.env`):
+> - 知识库目录（系统应用程序目录，与 `.env` 相同）：
 >   - macOS: `~/Library/Application Support/ValueCell/.knowledge`
 >   - Linux: `~/.config/valuecell/.knowledge`
 >   - Windows: `%APPDATA%\\ValueCell\\.knowledge`
-> - SQLite database file (system application directory, same as `.env`):
+> - SQLite 数据库文件（系统应用程序目录，与 `.env` 相同）：
 >   - macOS: `~/Library/Application Support/ValueCell/valuecell.db`
 >   - Linux: `~/.config/valuecell/valuecell.db`
 >   - Windows: `%APPDATA%\\ValueCell\\valuecell.db`
 
 ---
 
-## Configuration System Architecture
+## 配置系统架构
 
-### File Structure
+### 文件结构
 
 ```
 python/
 ├── configs/
-│   ├── config.yaml                    # Main configuration
-│   ├── config.{environment}.yaml      # Environment-specific overrides
+│   ├── config.yaml                    # 主配置文件
+│   ├── config.{environment}.yaml      # 环境特定覆盖
 │   ├── providers/
-│   │   ├── openrouter.yaml           # OpenRouter provider config
-│   │   ├── siliconflow.yaml          # SiliconFlow provider config
-│   │   ├── dashscope.yaml            # DashScope (Alibaba Cloud) provider config
+│   │   ├── openrouter.yaml           # OpenRouter 提供商配置
+│   │   ├── siliconflow.yaml          # SiliconFlow 提供商配置
+│   │   ├── dashscope.yaml            # DashScope（阿里云）提供商配置
 │   │   └── other_provider.yaml
 │   ├── agents/
-│   │   ├── super_agent.yaml          # Super Agent configuration
-│   │   ├── research_agent.yaml       # Research Agent configuration
-│   │   └── auto_trading_agent.yaml   # Auto Trading Agent configuration
-│   ├── agent_cards/                  # UI metadata for agents
-│   └── locales/                      # Internationalization files
+│   │   ├── super_agent.yaml          # Super Agent 配置
+│   │   ├── research_agent.yaml       # Research Agent 配置
+│   │   └── auto_trading_agent.yaml   # Auto Trading Agent 配置
+│   ├── agent_cards/                  # 代理的 UI 元数据
+│   └── locales/                      # 国际化文件
 └── valuecell/
     └── config/
-        ├── constants.py              # Configuration constants
-        ├── loader.py                 # YAML loader with env var resolution
-        └── manager.py                # High-level configuration API
+        ├── constants.py              # 配置常量
+        ├── loader.py                 # 带环境变量解析的 YAML 加载器
+        └── manager.py                # 高级配置 API
 ```
 
-### How Configuration Resolution Works
+### 配置解析工作原理
 
-#### 1. Provider Configuration Loading
+#### 1. 提供商配置加载
 
-When the system needs a model, it:
+当系统需要模型时，它会：
 
-1. **Loads provider YAML** (e.g., `configs/providers/openrouter.yaml`)
-2. **Resolves `${VAR}` placeholders** in YAML using environment variables
-3. **Applies env variable overrides** (e.g., `OPENROUTER_API_KEY` overrides `connection.api_key`)
-4. **Returns ProviderConfig** object with resolved values
+1. **加载提供商 YAML**（例如，`configs/providers/openrouter.yaml`）
+2. **解析 `${VAR}` 占位符**，使用环境变量替换 YAML 中的占位符
+3. **应用环境变量覆盖**（例如，`OPENROUTER_API_KEY` 覆盖 `connection.api_key`）
+4. **返回 ProviderConfig** 对象，包含解析后的值
 
-**Example: OpenRouter Configuration**
+**示例：OpenRouter 配置**
 
 ```yaml
 connection:
   base_url: "https://openrouter.ai/api/v1"
-  api_key_env: "OPENROUTER_API_KEY"    # Specifies which env var to use
+  api_key_env: "OPENROUTER_API_KEY"    # 指定要使用的环境变量
 
 default_model: "anthropic/claude-haiku-4.5"
 
@@ -127,19 +129,19 @@ defaults:
   max_tokens: 4096
 ```
 
-The system automatically reads `OPENROUTER_API_KEY` from `.env` or environment.
+系统会自动从 `.env` 或环境中读取 `OPENROUTER_API_KEY`。
 
-#### 2. Agent Configuration Loading
+#### 2. 代理配置加载
 
-When you create an agent (e.g., `research_agent`), the system:
+当您创建代理（例如，`research_agent`）时，系统会：
 
-1. **Loads agent YAML** (e.g., `configs/agents/research_agent.yaml`)
-The system automatically reads `OPENROUTER_API_KEY` from `.env` or environment.
-3. **Applies environment variable overrides** via `env_overrides` map
-4. **Merges with global defaults** from `config.yaml`
-5. **Returns AgentConfig** object with complete configuration
+1. **加载代理 YAML**（例如，`configs/agents/research_agent.yaml`）
+2. 系统会自动从 `.env` 或环境中读取 `OPENROUTER_API_KEY`。
+3. **通过 `env_overrides` 映射应用环境变量覆盖**
+4. **与 `config.yaml` 中的全局默认值合并**
+5. **返回 AgentConfig** 对象，包含完整配置
 
-**Example: Agent Configuration**
+**示例：代理配置**
 
 ```yaml
 name: "Research Agent"
@@ -160,33 +162,33 @@ env_overrides:
   RESEARCH_AGENT_PROVIDER: "models.primary.provider"
 ```
 
-This allows runtime overrides:
+这允许运行时覆盖：
 
 ```bash
 export RESEARCH_AGENT_MODEL_ID="anthropic/claude-3.5-sonnet"
 export RESEARCH_AGENT_PROVIDER="openrouter"
-# Now research agent uses Claude 3.5 Sonnet instead of Gemini
+# 现在 research agent 使用 Claude 3.5 Sonnet 而不是 Gemini
 ```
 
 ---
 
-## Detailed Configuration Reference
+## 详细配置参考
 
-### Global Configuration (`config.yaml`)
+### 全局配置（`config.yaml`）
 
-The main configuration file sets system-wide defaults:
+主配置文件设置系统范围的默认值：
 
 ```yaml
 models:
-  # Primary provider used if API keys from multiple providers are available
+  # 如果多个提供商都有 API 密钥，则使用的主提供商
   primary_provider: "openrouter"
   
-  # Global default parameters (used by all models unless overridden)
+  # 全局默认参数（除非被覆盖，否则所有模型都使用）
   defaults:
     temperature: 0.5
     max_tokens: 4096
   
-  # Provider registry
+  # 提供商注册表
   providers:
     openrouter:
       config_file: "providers/openrouter.yaml"
@@ -201,7 +203,7 @@ models:
       config_file: "providers/dashscope.yaml"
       api_key_env: "DASHSCOPE_API_KEY"
 
-# Agent registry
+# 代理注册表
 agents:
   super_agent:
     config_file: "agents/super_agent.yaml"
@@ -211,31 +213,31 @@ agents:
     config_file: "agents/auto_trading_agent.yaml"
 ```
 
-### Provider Configuration
+### 提供商配置
 
-Each provider has its own YAML file in `configs/providers/`. Here's the structure:
+每个提供商在 `configs/providers/` 中都有自己的 YAML 文件。结构如下：
 
 ```yaml
 name: "Provider Display Name"
-provider_type: "provider_id"           # Used internally
-enabled: true                          # Can be disabled without deleting config
+provider_type: "provider_id"           # 内部使用
+enabled: true                          # 可以在不删除配置的情况下禁用
 
-# Connection details
+# 连接详情
 connection:
   base_url: "https://api.example.com/v1"
-  api_key_env: "PROVIDER_API_KEY"      # Which env var to read
-  endpoint_env: "PROVIDER_ENDPOINT"    # Optional: for Azure-style endpoints
+  api_key_env: "PROVIDER_API_KEY"      # 要读取的环境变量
+  endpoint_env: "PROVIDER_ENDPOINT"    # 可选：用于 Azure 风格的端点
 
-# Default model when none specified
+# 未指定时的默认模型
 default_model: "model-id"
 
-# Default parameters for all models from this provider
+# 此提供商所有模型的默认参数
 defaults:
   temperature: 0.7
   max_tokens: 4096
   top_p: 0.95
 
-# List of available models
+# 可用模型列表
 models:
   - id: "model-id-1"
     name: "Model Display Name"
@@ -246,7 +248,7 @@ models:
     name: "Another Model"
     context_length: 256000
 
-# Embedding configuration (optional, not all providers support it)
+# 嵌入配置（可选，并非所有提供商都支持）
 embedding:
   default_model: "embedding-model-id"
   
@@ -260,38 +262,38 @@ embedding:
       dimensions: 1536
       max_input: 8192
 
-# Provider-specific configuration
+# 提供商特定配置
 extra_headers:
   HTTP-Referer: "https://valuecell.ai"
   X-Title: "ValueCell"
 ```
 
-### Agent Configuration
+### 代理配置
 
-Agent YAML files define how agents should be initialized. Key features:
+代理 YAML 文件定义如何初始化代理。主要特性：
 
 ```yaml
 name: "Agent Display Name"
 enabled: true
 
-# Model configuration
+# 模型配置
 models:
-  # Primary reasoning model
+  # 主要推理模型
   primary:
-    model_id: "model-id"               # Can use provider prefix (e.g., "anthropic/claude-3.5-sonnet")
-    provider: "openrouter"             # Must be explicit (not auto-detected)
+    model_id: "model-id"               # 可以使用提供商前缀（例如，"anthropic/claude-3.5-sonnet"）
+    provider: "openrouter"             # 必须明确指定（不自动检测）
     
-    # Fallback models for different providers
+    # 不同提供商的备用模型
     provider_models:
       siliconflow: "qwen/qwen3-max"
       google: "gemini-2.5-flash"
     
-    # Model-specific parameters (override provider defaults)
+    # 模型特定参数（覆盖提供商默认值）
     parameters:
       temperature: 0.8
       max_tokens: 8192
   
-  # Optional: separate embedding model configuration
+  # 可选：单独的嵌入模型配置
   embedding:
     model_id: "embedding-model-id"
     provider: "siliconflow"
@@ -300,15 +302,15 @@ models:
     parameters:
       dimensions: 2560
 
-# Map environment variables to config paths for runtime overrides
+# 将环境变量映射到配置路径以进行运行时覆盖
 env_overrides:
-  # Syntax: ENV_VAR -> config.path.to.value
+  # 语法：ENV_VAR -> config.path.to.value
   AGENT_MODEL_ID: "models.primary.model_id"
   AGENT_PROVIDER: "models.primary.provider"
   AGENT_TEMPERATURE: "models.primary.parameters.temperature"
   AGENT_MAX_TOKENS: "models.primary.parameters.max_tokens"
   
-  # Embedding configuration
+  # 嵌入配置
   AGENT_EMBEDDER_MODEL: "models.embedding.model_id"
   AGENT_EMBEDDER_PROVIDER: "models.embedding.provider"
 
@@ -316,15 +318,15 @@ env_overrides:
 
 ---
 
-## Provider Auto-Detection and Fallback
+## 提供商自动检测和回退
 
-### Auto-Detection
+### 自动检测
 
-ValueCell automatically selects a primary provider based on available API keys:
+ValueCell 根据可用的 API 密钥自动选择主提供商：
 
-**Priority order** (if multiple providers have API keys):
+**优先级顺序**（如果多个提供商都有 API 密钥）：
 
-The selection logic is implemented in `python/valuecell/config/manager.py`:
+选择逻辑在 `python/valuecell/config/manager.py` 中实现：
 
 1. OpenRouter
 2. SiliconFlow
@@ -332,84 +334,84 @@ The selection logic is implemented in `python/valuecell/config/manager.py`:
 4. OpenAI
 5. OpenAI-Compatible
 6. Azure
-7. Other configured providers (including DashScope, DeepSeek, etc.)
+7. 其他配置的提供商（包括 DashScope、DeepSeek 等）
 
-Override this with an environment variable:
+通过环境变量覆盖：
 
 ```bash
 export PRIMARY_PROVIDER=siliconflow
 ```
 
-Or disable auto-detection:
+或禁用自动检测：
 
 ```bash
 export AUTO_DETECT_PROVIDER=false
 ```
 
-### Fallback Mechanism
+### 回退机制
 
-If the primary provider fails, ValueCell automatically tries fallback providers.
+如果主提供商失败，ValueCell 会自动尝试回退提供商。
 
-**Fallback chain** (auto-populated from enabled providers):
-- All providers with valid API keys, except the primary provider
-- Stops at first successful model creation
+**回退链**（从启用的提供商自动填充）：
+- 除主提供商外，所有具有有效 API 密钥的提供商
+- 在第一次成功的模型创建时停止
 
-To override fallback providers:
+覆盖回退提供商：
 
 ```bash
 export FALLBACK_PROVIDERS=siliconflow,google
 ```
 
-To disable fallback:
+禁用回退：
 
 ```bash
-# In agent YAML
+# 在代理 YAML 中
 use_fallback: false
 ```
 
-### Provider-Specific Model Mapping
+### 提供商特定模型映射
 
-When using fallback, agents can specify which model to use for each provider:
+使用回退时，代理可以为每个提供商指定要使用的模型：
 
 ```yaml
-# In agent configuration
+# 在代理配置中
 models:
   primary:
     model_id: "anthropic/claude-haiku-4.5"
     provider: "openrouter"
     
-    # If OpenRouter fails, use these models for fallback providers
+    # 如果 OpenRouter 失败，为回退提供商使用这些模型
     provider_models:
-      siliconflow: "zai-org/GLM-4.6"      # Similar capability
-      google: "gemini-2.5-flash"          # Fast and efficient
+      siliconflow: "zai-org/GLM-4.6"      # 类似能力
+      google: "gemini-2.5-flash"          # 快速高效
 ```
 
-When fallback occurs:
-1. Try OpenRouter with `anthropic/claude-haiku-4.5`
-2. If fails, try SiliconFlow with `zai-org/GLM-4.6`
-3. If fails, try Google with `gemini-2.5-flash`
+当发生回退时：
+1. 尝试使用 `anthropic/claude-haiku-4.5` 的 OpenRouter
+2. 如果失败，尝试使用 `zai-org/GLM-4.6` 的 SiliconFlow
+3. 如果失败，尝试使用 `gemini-2.5-flash` 的 Google
 
 ---
 
-## Environment Variables Reference
+## 环境变量参考
 
-### Global Configuration
+### 全局配置
 
 ```bash
-# Primary provider selection
+# 主提供商选择
 PRIMARY_PROVIDER=openrouter
 
-# Auto-detect provider from API keys (default: true)
+# 从 API 密钥自动检测提供商（默认：true）
 AUTO_DETECT_PROVIDER=true
 
-# Comma-separated fallback provider chain
+# 逗号分隔的回退提供商链
 FALLBACK_PROVIDERS=siliconflow,google
 
-# Application environment
+# 应用程序环境
 APP_ENVIRONMENT=production
 ```
 
-### Provider Credentials
+### 提供商凭证
 
 ```bash
 # OpenRouter
@@ -421,19 +423,19 @@ SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxx
 # Google
 GOOGLE_API_KEY=AIzaSyDxxxxxxxxxxxxx
 
-# Azure OpenAI (if using Azure provider)
+# Azure OpenAI（如果使用 Azure 提供商）
 AZURE_OPENAI_API_KEY=xxxxxxxxxxxxx
 AZURE_OPENAI_ENDPOINT=https://xxxxx.openai.azure.com/
 OPENAI_API_VERSION=2024-10-21
 
-# DashScope (Alibaba Cloud Qwen3 models)
+# DashScope（阿里云 Qwen3 模型）
 DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxx
 ```
 
-### Model Configuration
+### 模型配置
 
 ```bash
-# Global model overrides
+# 全局模型覆盖
 PLANNER_MODEL_ID=anthropic/claude-3.5-sonnet
 EMBEDDER_MODEL_ID=openai/text-embedding-3-large
 
@@ -453,68 +455,69 @@ AUTO_TRADING_AGENT_MODEL_ID=model-id
 AUTO_TRADING_AGENT_PROVIDER=openrouter
 ```
 
-### Debugging
+### 调试
 
 ```bash
-# Enable debug logging
+# 启用调试日志
 AGENT_DEBUG_MODE=true
 ```
 
 ---
 
-## Configuration Patterns
+## 配置模式
 
-### Pattern 1: Multi-Model Setup with Fallback
+### 模式 1：带回退的多模型设置
 
-**Use case**: High availability with cost optimization
+**用例**：高可用性和成本优化
 
 ```bash
-# .env file
-OPENROUTER_API_KEY=sk-or-v1-xxxxx        # Primary: access to many models
-SILICONFLOW_API_KEY=sk-xxxxx             # Fallback: cost-effective
-GOOGLE_API_KEY=AIzaSyD-xxxxx             # Second fallback: specialized
-DASHSCOPE_API_KEY=sk-xxxxx               # DashScope: Qwen3 models (Chinese optimized)
+# .env 文件
+OPENROUTER_API_KEY=sk-or-v1-xxxxx        # 主：访问许多模型
+SILICONFLOW_API_KEY=sk-xxxxx             # 回退：成本效益高
+GOOGLE_API_KEY=AIzaSyD-xxxxx             # 第二回退：专业化
+DASHSCOPE_API_KEY=sk-xxxxx               # DashScope：Qwen3 模型（中文优化）
 
 # config.yaml
 models:
-  primary_provider: "openrouter"          # Primary (best models)
-  # Fallback auto-populated as [siliconflow, google]
+  primary_provider: "openrouter"          # 主（最佳模型）
+  # 回退自动填充为 [siliconflow, google]
 ```
 
-### Pattern 2: Specialized Models per Agent
+### 模式 2：每个代理的专用模型
 
-**Use case**: Optimize each agent for its task
+**用例**：为每个代理优化其任务
 
 ```yaml
-# In research_agent.yaml
+# 在 research_agent.yaml 中
 models:
   primary:
     provider: "openrouter"
-    model_id: "anthropic/claude-3.5-sonnet"  # Best for research
+    model_id: "anthropic/claude-3.5-sonnet"  # 最适合研究
     
   embedding:
     provider: "siliconflow"
-    model_id: "Qwen/Qwen3-Embedding-4B"      # Best embeddings
+    model_id: "Qwen/Qwen3-Embedding-4B"      # 最佳嵌入
 ```
 
-### Pattern 3: Development vs Production
+### 模式 3：开发与生产
 
-### OKX Trading
+### OKX 交易
 
-| Variable                 | Default | Description                                                        |
+| 变量                 | 默认值 | 描述                                                        |
 | ------------------------ | ------- | ------------------------------------------------------------------ |
-| `OKX_NETWORK`            | `paper` | Choose `paper` for demo trading or `mainnet` for live environment. |
-| `OKX_API_KEY`            | —       | OKX API key generated from the OKX console.                        |
-| `OKX_API_SECRET`         | —       | API secret corresponding to the key.                               |
-| `OKX_API_PASSPHRASE`     | —       | Passphrase set when creating the OKX API key.                      |
-| `OKX_ALLOW_LIVE_TRADING` | `false` | Must be `true` before routing orders to the mainnet environment.   |
-| `OKX_MARGIN_MODE`        | `cash`  | Trading mode passed to OKX (`cash`, `cross`, `isolated`).          |
-| `OKX_USE_SERVER_TIME`    | `false` | Enable to sync with OKX server time for order stamping.            |
+| `OKX_NETWORK`            | `paper` | 选择 `paper` 进行模拟交易或 `mainnet` 进行实盘环境。 |
+| `OKX_API_KEY`            | —       | 从 OKX 控制台生成的 OKX API 密钥。                        |
+| `OKX_API_SECRET`         | —       | 与密钥对应的 API 密钥。                               |
+| `OKX_API_PASSPHRASE`     | —       | 创建 OKX API 密钥时设置的密码。                      |
+| `OKX_ALLOW_LIVE_TRADING` | `false` | 在将订单路由到主网环境之前必须为 `true`。   |
+| `OKX_MARGIN_MODE`        | `cash`  | 传递给 OKX 的交易模式（`cash`、`cross`、`isolated`）。          |
+| `OKX_USE_SERVER_TIME`    | `false` | 启用以与 OKX 服务器时间同步以进行订单时间戳。            |
 
 > [!IMPORTANT]
-> Keep `OKX_ALLOW_LIVE_TRADING=false` until strategies are validated on the OKX paper environment. Treat API secrets as production credentials and store them in a secure vault.
+> 在 OKX 模拟环境中验证策略之前，保持 `OKX_ALLOW_LIVE_TRADING=false`。将 API 密钥视为生产凭证，并将其存储在安全的保险库中。
 
-## Troubleshooting
+## 故障排除
+
 ```bash
 # .env.production  
 OPENROUTER_API_KEY=sk-or-v1-prod-xxxxx
@@ -522,14 +525,14 @@ SILICONFLOW_API_KEY=sk-prod-xxxxx
 APP_ENVIRONMENT=production
 ```
 
-Then create `config.production.yaml` with production-specific settings.
+然后创建 `config.production.yaml`，包含生产特定设置。
 
-### Pattern 4: Runtime Overrides
+### 模式 4：运行时覆盖
 
-**Use case**: A/B testing different models without code changes
+**用例**：在不更改代码的情况下 A/B 测试不同模型
 
 ```bash
-# Script to test different models
+# 测试不同模型的脚本
 for model in "gpt-4o" "claude-3.5-sonnet" "gemini-2.5-flash"; do
     echo "Testing: $model"
     RESEARCH_AGENT_MODEL_ID="$model" python your_script.py
@@ -538,91 +541,91 @@ done
 
 ---
 
-## For Developers
+## 开发者指南
 
-### Configuration System Architecture
+### 配置系统架构
 
-The configuration system has three layers:
+配置系统有三层：
 
-1. **Loader Layer** (`valuecell/config/loader.py`)
-   - Reads YAML files
-   - Resolves `${VAR}` placeholders
-   - Applies environment variable overrides
-   - Implements caching
+1. **加载器层**（`valuecell/config/loader.py`）
+   - 读取 YAML 文件
+   - 解析 `${VAR}` 占位符
+   - 应用环境变量覆盖
+   - 实现缓存
 
-2. **Manager Layer** (`valuecell/config/manager.py`)
-   - High-level configuration access
-   - Provider validation
-   - Model factory integration
-   - Fallback chain management
+2. **管理器层**（`valuecell/config/manager.py`）
+   - 高级配置访问
+   - 提供商验证
+   - 模型工厂集成
+   - 回退链管理
 
-3. **Factory Layer** (`valuecell/adapters/models/factory.py`)
-   - Creates actual model instances
-   - Provider-specific implementations
-   - Parameter merging
-   - Error handling and fallback
+3. **工厂层**（`valuecell/adapters/models/factory.py`）
+   - 创建实际模型实例
+   - 提供商特定实现
+   - 参数合并
+   - 错误处理和回退
 
 
-### Creating a Model
+### 创建模型
 
 ```python
 from valuecell.utils.model import get_model, get_model_for_agent
 
-# Use default configuration
+# 使用默认配置
 model = get_model("PLANNER_MODEL_ID")
 
-# Override with kwargs
+# 使用 kwargs 覆盖
 model = get_model("RESEARCH_AGENT_MODEL_ID", temperature=0.9, max_tokens=16384)
 
-# Get agent-specific model
+# 获取代理特定模型
 model = get_model_for_agent("research_agent", temperature=0.8)
 
-# Use specific provider
+# 使用特定提供商
 from valuecell.utils.model import create_model_with_provider
 model = create_model_with_provider("openrouter", "anthropic/claude-3.5-sonnet")
 ```
 
-### Adding a New Provider
+### 添加新提供商
 
-1. **Create provider YAML** (`configs/providers/my_provider.yaml`)
-2. **Implement provider class** in `valuecell/adapters/models/factory.py`
-3. **Register provider** in `ModelFactory._providers`
-4. **Add to config.yaml** provider registry
-5. **Add tests** for provider configuration
-
----
-
-## Best Practices
-
-1. **Set API Keys in .env**
-   - Never commit API keys to version control
-   - Use `.gitignore` to exclude `.env`
-   - Use environment variables in CI/CD
-
-2. **Use Provider Fallback**
-   - Configure multiple providers for reliability
-   - Specify `provider_models` in agents for consistent fallback
-   - Test fallback behavior before deployment
-
-3. **Monitor Configuration**
-   - Log configuration selection decisions
-   - Validate configuration on startup
-   - Alert on missing API keys in production
-
-4. **Version Your Configuration**
-   - Keep agent configurations in version control
-   - Document why specific models are chosen
-   - Review configuration changes in code review
-
-5. **Optimize Costs**
-   - Use cheaper models for simple tasks
-   - Use faster models for real-time applications
-   - Monitor API usage and set spending limits
+1. **创建提供商 YAML**（`configs/providers/my_provider.yaml`）
+2. **在 `valuecell/adapters/models/factory.py` 中实现提供商类**
+3. **在 `ModelFactory._providers` 中注册提供商**
+4. **添加到 config.yaml** 提供商注册表
+5. **添加提供商配置测试**
 
 ---
 
-## Support
+## 最佳实践
 
-For configuration issues or questions:
-- Ask on [Discord Community](https://discord.com/invite/84Kex3GGAh)
-- Report bugs on [GitHub Issues](https://github.com/valuecell/valuecell/issues)
+1. **在 .env 中设置 API 密钥**
+   - 永远不要将 API 密钥提交到版本控制
+   - 使用 `.gitignore` 排除 `.env`
+   - 在 CI/CD 中使用环境变量
+
+2. **使用提供商回退**
+   - 配置多个提供商以提高可靠性
+   - 在代理中指定 `provider_models` 以保持一致的回退
+   - 在部署前测试回退行为
+
+3. **监控配置**
+   - 记录配置选择决策
+   - 在启动时验证配置
+   - 在生产中提醒缺少 API 密钥
+
+4. **版本化配置**
+   - 在版本控制中保留代理配置
+   - 记录选择特定模型的原因
+   - 在代码审查中审查配置更改
+
+5. **优化成本**
+   - 对简单任务使用更便宜的模型
+   - 对实时应用程序使用更快的模型
+   - 监控 API 使用情况并设置支出限制
+
+---
+
+## 支持
+
+如有配置问题或疑问：
+- 在 [Discord 社区](https://discord.com/invite/84Kex3GGAh) 提问
+- 在 [GitHub Issues](https://github.com/valuecell/valuecell/issues) 报告错误

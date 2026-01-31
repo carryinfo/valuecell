@@ -1,20 +1,20 @@
-# ValueCell Core Architecture
+# ValueCell 核心架构
 
-This document explains how the modules under `valuecell/core/` collaborate at runtime.
+本文档解释 `valuecell/core/` 下的模块在运行时如何协作。
 
-## Highlights
+## 亮点
 
-- Super Agent triage ahead of planning: a lightweight "Super Agent" analyzes the user input first and either answers directly or hands off an enriched query to the planner.
-- Async, re-entrant orchestrator: `process_user_input` streams responses and now runs planning/execution in a background producer so long-running work continues even if the client disconnects.
-- Planner with HITL: pauses on missing info/risky steps via `UserInputRequest`, resumes after user feedback to produce an adequate plan.
-- Streaming pipeline: A2A status events → `ResponseRouter` (map to BaseResponse) → `ResponseBuffer` (annotate/aggregate) → persisted to Store and streamed to UI, with stable item IDs for partial aggregation.
-- Agent2Agent (A2A) integration: tasks call remote agents via `a2a-sdk`; status events drive routing; agents can be wrapped by lightweight decorators/servers.
-- Conversation memory: in-memory/SQLite stores enable reproducible history, fast "resume from last", and auditability.
-- Robustness: typed errors, side-effects (e.g., fail task) from router, and room for retry/backoff policies where appropriate.
+- Super Agent 在规划前进行分流：轻量级"Super Agent"首先分析用户输入，要么直接回答，要么将丰富的查询交给规划器。
+- 异步、可重入的编排器：`process_user_input` 流式传输响应，现在在后台生产者中运行规划/执行，因此即使客户端断开连接，长时间运行的工作也会继续。
+- 带 HITL 的规划器：在缺少信息/风险步骤时通过 `UserInputRequest` 暂停，在用户反馈后恢复以产生充分的计划。
+- 流式管道：A2A 状态事件 → `ResponseRouter`（映射到 BaseResponse）→ `ResponseBuffer`（注释/聚合）→ 持久化到 Store 并流式传输到 UI，具有稳定的项目 ID 用于部分聚合。
+- Agent2Agent (A2A) 集成：任务通过 `a2a-sdk` 调用远程代理；状态事件驱动路由；代理可以通过轻量级装饰器/服务器包装。
+- 对话记忆：内存/SQLite 存储支持可重现的历史记录、快速的"从上次恢复"和可审计性。
+- 健壮性：类型化错误、来自路由器的副作用（例如，失败任务），以及在适当的地方进行重试/退避策略的空间。
 
-## Services interaction overview
+## 服务交互概述
 
-The diagram below focuses on how the orchestrator collaborates with the core services. It reflects the current code structure under `coordinate/`, `super_agent/`, `plan/`, `task/`, `event/`, and `conversation/`.
+下面的图表重点关注编排器如何与核心服务协作。它反映了 `coordinate/`、`super_agent/`、`plan/`、`task/`、`event/` 和 `conversation/` 下的当前代码结构。
 
 ```mermaid
 flowchart LR
@@ -68,17 +68,17 @@ flowchart LR
   O -->|stream annotated responses| UI
 ```
 
-Key points:
+要点：
 
-- Orchestrator is the hub: it calls SuperAgentService, PlanService, TaskExecutor, and uses ConversationService to manage statuses.
-- EventResponseService performs two roles:
-  - Routing: maps remote task status events to typed BaseResponses via ResponseRouter.
-  - Buffering & persistence: annotates with stable item IDs via ResponseBuffer and writes to the conversation store.
-- Super Agent can short-circuit with a direct answer; otherwise it hands off an enriched query to the planner.
+- 编排器是中心：它调用 SuperAgentService、PlanService、TaskExecutor，并使用 ConversationService 管理状态。
+- EventResponseService 执行两个角色：
+  - 路由：通过 ResponseRouter 将远程任务状态事件映射到类型化的 BaseResponses。
+  - 缓冲和持久化：通过 ResponseBuffer 使用稳定的项目 ID 进行注释，并写入对话存储。
+- Super Agent 可以通过直接答案短路；否则它将丰富的查询交给规划器。
 
-## High-level flow
+## 高级流程
 
-The orchestration loop ingests a user input, lets the Super Agent triage and possibly answer or enrich the request, then plans next steps (with HITL when needed) and executes tasks via remote agents (A2A). Responses stream back incrementally and are routed to the appropriate sinks (UI, logs, stores).
+编排循环接收用户输入，让 Super Agent 分流并可能回答或丰富请求，然后规划下一步（在需要时使用 HITL）并通过远程代理（A2A）执行任务。响应增量流回并路由到适当的接收器（UI、日志、存储）。
 
 ```mermaid
 flowchart TD
@@ -103,7 +103,7 @@ flowchart TD
   RB2 --> ST[Store]
 ```
 
-### Sequence: async and reentrancy
+### 序列：异步和可重入性
 
 ```mermaid
 sequenceDiagram
@@ -153,149 +153,149 @@ sequenceDiagram
   end
 ```
 
-## Orchestrator: process_user_input
+## 编排器：process_user_input
 
-The orchestrator entrypoint (`coordinate/orchestrator.py::AgentOrchestrator.process_user_input`) receives a user message (plus context IDs) and coordinates the entire lifecycle:
+编排器入口点（`coordinate/orchestrator.py::AgentOrchestrator.process_user_input`）接收用户消息（加上上下文 ID）并协调整个生命周期：
 
-1. Delegate to the Super Agent to triage the request: directly answer simple queries or enrich the query and hand off to planning
-2. Run the Planner to derive an actionable plan; if the plan needs confirmation or extra parameters, trigger Human-in-the-Loop (HITL)
-3. Execute the plan via the Task Executor
-4. Stream partial responses while executing
-5. Persist results and emit final responses
+1. 委托给 Super Agent 以分流请求：直接回答简单查询或丰富查询并交给规划
+2. 运行规划器以派生可执行的计划；如果计划需要确认或额外参数，触发人机交互循环（HITL）
+3. 通过任务执行器执行计划
+4. 在执行时流式传输部分响应
+5. 持久化结果并发出最终响应
 
-The orchestrator is async and re-entrant, and now decouples producers/consumers:
+编排器是异步和可重入的，现在解耦了生产者/消费者：
 
-- All I/O boundaries (`await`) are explicit to support concurrency
-- A background producer continues planning/execution even if the client disconnects; the async generator simply drains a per-call queue
-- If a human confirmation is required, the orchestrator can pause, surface a checkpoint, and resume later when feedback arrives
-- Reentrancy is supported by idempotent response buffering and conversation state: resuming continues from the last acknowledged step
+- 所有 I/O 边界（`await`）都是显式的，以支持并发
+- 后台生产者继续规划/执行，即使客户端断开连接；异步生成器只是排空每个调用的队列
+- 如果需要人工确认，编排器可以暂停、显示检查点，并在反馈到达时稍后恢复
+- 通过幂等响应缓冲和对话状态支持可重入性：恢复从最后确认的步骤继续
 
-### Streaming model
+### 流式模型
 
-Responses are produced incrementally while tasks execute:
+响应在执行任务时增量产生：
 
-- Remote agent status events are first mapped by `ResponseRouter` into typed `Response` objects (message chunks, reasoning, tool results, components)
-- `ResponseBuffer` annotates with stable item IDs and aggregates partials, and `EventResponseService` persists them to the conversation store
-- The orchestrator streams the annotated responses to the UI; persistence and streaming are decoupled from the client connection
+- 远程代理状态事件首先由 `ResponseRouter` 映射到类型化的 `Response` 对象（消息块、推理、工具结果、组件）
+- `ResponseBuffer` 使用稳定的项目 ID 进行注释和聚合部分，`EventResponseService` 将它们持久化到对话存储
+- 编排器将注释的响应流式传输到 UI；持久化和流式传输与客户端连接解耦
 
-This allows the UI to render partial progress while long-running steps (such as remote agent calls) are still in flight.
+这允许 UI 在长时间运行的步骤（例如远程代理调用）仍在进行时呈现部分进度。
 
-## Super Agent: triage before planning
+## Super Agent：规划前分流
 
-The Super Agent performs a quick, tool-augmented triage of the user input to decide whether it can answer directly or should hand off to the planner.
+Super Agent 对用户输入执行快速、工具增强的分流，以决定是直接回答还是交给规划器。
 
-Responsibilities:
+职责：
 
-- Detect simple Q&A or retrieval-style requests that can be answered immediately
-- Optionally enrich/normalize the query and provide a concise restatement for planning
-- Record minimal rationale for auditability
+- 检测可以立即回答的简单问答或检索式请求
+- 可选地丰富/规范化查询并为规划提供简洁的重述
+- 记录最少的理由以供审计
 
-Under the hood:
+底层实现：
 
-- `super_agent/core.py` defines the `SuperAgent`, decision schema (`SuperAgentOutcome`) and tool wiring
-- `super_agent/prompts.py` contains the instruction and expected output schema
-- `super_agent/service.py` exposes a simple façade used by the orchestrator
+- `super_agent/core.py` 定义 `SuperAgent`、决策模式（`SuperAgentOutcome`）和工具连接
+- `super_agent/prompts.py` 包含指令和预期输出模式
+- `super_agent/service.py` 公开编排器使用的简单外观
 
-If the decision is ANSWER, the orchestrator streams the content and returns. If the decision is HANDOFF_TO_PLANNER, the enriched query is passed to the planner.
+如果决策是 ANSWER，编排器流式传输内容并返回。如果决策是 HANDOFF_TO_PLANNER，丰富的查询将传递给规划器。
 
-## Planner: intent → plan (with HITL)
+## 规划器：意图 → 计划（带 HITL）
 
-The Planner turns a natural-language user input (often enriched by the Super Agent) into an executable plan. Its responsibilities include:
+规划器将自然语言用户输入（通常由 Super Agent 丰富）转换为可执行的计划。其职责包括：
 
-- Interpreting the user’s goal and available agent capabilities
-- Identifying missing parameters and ambiguities
-- Producing a typed plan describing the steps and tool/agent calls
+- 解释用户的目标和可用的代理能力
+- 识别缺失的参数和歧义
+- 产生描述步骤和工具/代理调用的类型化计划
 
-Human-in-the-loop is integrated into planning:
+人机交互循环集成到规划中：
 
-- When the planner detects insufficient information or risky actions, it emits a “clarification/approval” checkpoint
-- The orchestrator surfaces that checkpoint via the router to the UI/user
-- Once the user adds information or approves the step, the orchestrator resumes with an updated plan context
+- 当规划器检测到信息不足或风险操作时，它会发出"澄清/批准"检查点
+- 编排器通过路由器将该检查点呈现给 UI/用户
+- 一旦用户添加信息或批准步骤，编排器就会使用更新的计划上下文恢复
 
-Under the hood:
+底层实现：
 
-- `plan/planner.py` encapsulates the decision logic (`ExecutionPlanner` and `UserInputRequest`)
-- `plan/prompts.py` centralizes prompt templates (when LLM-based planning is used)
-- `plan/models.py` defines plan/step data models, consumed by the orchestrator and executor
-- `plan/service.py` manages the planner lifecycle and the pending user-input registry
+- `plan/planner.py` 封装决策逻辑（`ExecutionPlanner` 和 `UserInputRequest`）
+- `plan/prompts.py` 集中提示模板（当使用基于 LLM 的规划时）
+- `plan/models.py` 定义计划/步骤数据模型，由编排器和执行器使用
+- `plan/service.py` 管理规划器生命周期和待处理的用户输入注册表
 
-## Task execution
+## 任务执行
 
-After planning, the Task Executor runs each task. A task is an atomic unit that typically invokes a remote agent to perform work. Scheduled tasks are supported and can re-run according to their schedule; streaming output is accumulated and summarized for schedule results.
+规划后，任务执行器运行每个任务。任务是原子单元，通常调用远程代理来执行工作。支持计划任务，可以根据其计划重新运行；流式输出被累积并汇总为计划结果。
 
-Execution characteristics:
+执行特征：
 
-- Tasks are awaited asynchronously; independent tasks may run concurrently when safe
-- Each task emits structured responses (tool results, logs, progress) as it runs
-- Failures are converted into typed errors and can trigger retries or compensating steps (policy-dependent)
-- When the Super Agent hands off to a specific sub-agent, start/end components are emitted to mark that sub-agent conversation window
+- 任务异步等待；独立任务在安全时可以并发运行
+- 每个任务在运行时发出结构化响应（工具结果、日志、进度）
+- 失败被转换为类型化错误，可以触发重试或补偿步骤（取决于策略）
+- 当 Super Agent 交给特定子代理时，发出开始/结束组件以标记该子代理对话窗口
 
-Under the hood:
+底层实现：
 
-- `task/executor.py` streams execution, integrates scheduled task accumulation, and routes A2A events through the response service
-- `task/service.py` persists and transitions task state; `task/models.py` define the task’s shape
+- `task/executor.py` 流式执行，集成计划任务累积，并通过响应服务路由 A2A 事件
+- `task/service.py` 持久化和转换任务状态；`task/models.py` 定义任务的形状
 
-The conversation and item stores record inputs/outputs for reproducibility and auditing.
+对话和项目存储记录输入/输出以供重现和审计。
 
-## A2A integration: talking to remote agents
+## A2A 集成：与远程代理通信
 
-Each task uses the Agent2Agent (A2A) protocol to interact with remote agents:
+每个任务使用 Agent2Agent (A2A) 协议与远程代理交互：
 
-- Request/response schemas are defined by the agent capability “cards” and message models
-- The local runtime uses `a2a-sdk` to send/receive over the selected transport (HTTP or others)
-- Streaming results are fed into `ResponseBuffer` and routed live to clients
+- 请求/响应模式由代理能力"卡片"和消息模型定义
+- 本地运行时使用 `a2a-sdk` 通过所选传输（HTTP 或其他）发送/接收
+- 流式结果被输入到 `ResponseBuffer` 并实时路由到客户端
 
-This protocol boundary makes agents location-transparent: they can run locally, remotely, or be swapped without changing the orchestrator.
+此协议边界使代理位置透明：它们可以在本地、远程运行，或在不需要更改编排器的情况下交换。
 
-## Agent implementation: decorators and wiring
+## 代理实现：装饰器和连接
 
-Remote agents can be embedded with a very small footprint using the core agent decorator and wiring utilities:
+远程代理可以使用核心代理装饰器和连接实用程序以非常小的占用空间嵌入：
 
-- `agent/decorator.py` wraps a plain async function into a fully-typed agent handler
-- `agent/connect.py` wires the decorated function into the runtime (registration, routing)
-- `agent/card.py` describes capabilities, inputs, and outputs so the planner can select it
+- `agent/decorator.py` 将普通异步函数包装为完全类型化的代理处理程序
+- `agent/connect.py` 将装饰的函数连接到运行时（注册、路由）
+- `agent/card.py` 描述能力、输入和输出，以便规划器可以选择它
 
-The planner can select this capability when it fits the user’s goal, and the orchestrator will route a task through A2A to execute it.
+当它适合用户目标时，规划器可以选择此能力，编排器将通过 A2A 路由任务来执行它。
 
-## Conversation and memory
+## 对话和记忆
 
-`conversation_store.py` and `item_store.py` abstract conversation history and per-item storage:
+`conversation_store.py` 和 `item_store.py` 抽象对话历史和每项存储：
 
-- In-memory and SQLite backends are available
-- Filtering and pagination support efficient context retrieval
-- Latest items can be fetched for fast “resume from last” behaviors
+- 内存和 SQLite 后端可用
+- 过滤和分页支持高效的上下文检索
+- 可以获取最新项目以快速"从上次恢复"行为
 
-This memory layer underpins reentrancy and auditability.
+此记忆层支持可重入性和可审计性。
 
-## Async & reentrancy details
+## 异步和可重入性详情
 
-- All external calls (super-agent triage, planning, remote agents, storage) are awaited
-- A background producer runs independently of the client connection; consumers can cancel without stopping execution
-- `ResponseBuffer` enables idempotent aggregation of partial output so a resumed session can safely replay or continue
-- Orchestrator checkpoints (HITL) are modeled as explicit yield points; upon resumption, the same context IDs lead the flow to continue from the next step
-- Execution contexts support validation (user consistency, TTL) and cleanup of expired sessions
-- Backpressure: routers can apply flow control when sinks are slow
+- 所有外部调用（super-agent 分流、规划、远程代理、存储）都被等待
+- 后台生产者独立于客户端连接运行；消费者可以在不停止执行的情况下取消
+- `ResponseBuffer` 支持部分输出的幂等聚合，因此恢复的会话可以安全地重放或继续
+- 编排器检查点（HITL）被建模为显式产生点；恢复时，相同的上下文 ID 引导流程从下一步继续
+- 执行上下文支持验证（用户一致性、TTL）和过期会话的清理
+- 背压：当接收器较慢时，路由器可以应用流控制
 
-## Error handling & resilience
+## 错误处理和恢复能力
 
-Typical edge cases and policies:
+典型边缘情况和策略：
 
-- Missing parameters → HITL clarification
-- Super Agent errors → surfaced as structured failures; fallback to planner handoff can be policy-defined
-- Planner errors → structured failure with user-facing guidance
-- Agent timeouts → retry/backoff policies; partial results remain in the buffer
-- Transport errors → surfaced via typed exceptions; orchestration may retry or abort
-- Invalid or expired execution contexts → cancelled safely with user-facing messages
-- Consistency → conversation records ensure inputs/outputs are durable
+- 缺失参数 → HITL 澄清
+- Super Agent 错误 → 作为结构化失败呈现；回退到规划器移交可以是策略定义的
+- 规划器错误 → 带有面向用户指导的结构化失败
+- 代理超时 → 重试/退避策略；部分结果保留在缓冲区中
+- 传输错误 → 通过类型化异常呈现；编排可能重试或中止
+- 无效或过期的执行上下文 → 安全取消并带有面向用户的消息
+- 一致性 → 对话记录确保输入/输出是持久的
 
-## Extensibility
+## 可扩展性
 
-- Add a new agent: create a capability card, implement a decorated async handler, register/connect it
-- Add a new store: implement the `ItemStore`/`ConversationStore` interfaces
-- Add a new transport: integrate a compatible adapter and update the A2A client wiring
-- Customize the Super Agent: adjust prompts/decision logic or tools; control when to answer vs handoff
-- Customize planning: extend planner prompts/logic and enrich plan models
+- 添加新代理：创建能力卡片，实现装饰的异步处理程序，注册/连接它
+- 添加新存储：实现 `ItemStore`/`ConversationStore` 接口
+- 添加新传输：集成兼容适配器并更新 A2A 客户端连接
+- 自定义 Super Agent：调整提示/决策逻辑或工具；控制何时回答与移交
+- 自定义规划：扩展规划器提示/逻辑并丰富计划模型
 
 ---
 
-In short, the orchestrator coordinates an async, re-entrant loop of triage → plan → execute → stream, with human checkpoints where appropriate. The Super Agent can answer or enrich before planning, tasks talk A2A to remote agents, and the response pipeline keeps users informed in real time while maintaining durable, reproducible state.
+简而言之，编排器协调异步、可重入的分流 → 规划 → 执行 → 流式传输循环，在适当的地方有人工检查点。Super Agent 可以在规划前回答或丰富，任务通过 A2A 与远程代理通信，响应管道在维护持久、可重现状态的同时实时通知用户。
