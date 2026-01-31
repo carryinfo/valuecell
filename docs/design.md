@@ -181,3 +181,54 @@ Planner 不做业务逻辑推理，只做「输入 → 结构化 JSON」的推�
 - **推理**：SuperAgent 与子 Agent 的「思考过程」通过 reasoning 三件套事件流式呈现；Planner 的「推理」体现在 LLM 产出结构化 PlannerResponse（任务拆解与 adequate/guidance）。  
 - **任务拆解**：由 Planner 的 LLM + 工具（get_enabled_agents / get_agent_description）在 `_analyze_input_and_create_tasks` 中完成，结果为 `ExecutionPlan.tasks`（List[Task]），当前策略是单任务为主，多任务未展开。  
 - **Plan**：即 `ExecutionPlan`，包含元数据、orig_query、tasks、guidance_message；从创建到执行由 PlanService 与 TaskExecutor 协同完成。
+
+---
+
+## 8. 推理日志规范
+
+每次流式对话会写入一份推理日志文件，便于排查与复盘「SuperAgent 推理 / Plan 拆解 / Human-in-the-Loop / 任务执行」等环节。
+
+### 8.1 文件路径与命名
+
+- **目录**：由环境变量 `REASONING_LOG_DIR` 指定，未设置时默认为当前工作目录下的 `reasoning_logs`。
+- **文件名**：`reasoning_<timestamp>.log`，其中 `timestamp` 为 UTC 时间，格式 `YYYY-MM-DDTHH-MM-SS`（如 `reasoning_2026-01-31T15-30-00.log`）。
+- **生成时机**：每次调用 `AgentStreamService.stream_query_agent` 时创建新文件，该次请求的整段流式响应写在同一文件中。
+
+相关代码：`python/valuecell/server/services/agent_stream_service.py`（`_reasoning_log_path`、`stream_query_agent`）。
+
+### 8.2 行格式（JSONL）
+
+- 每行一个 JSON 对象，UTF-8 编码。
+- 通过首行的 `type` 或 `event` 字段区分行类型。
+
+### 8.3 行类型说明
+
+| 行类型 | 说明 | 主要字段 |
+|--------|------|----------|
+| **session_start** | 会话开始 | `type`, `query`, `conversation_id`, `agent_name`, `ts` |
+| **reasoning_block** | 合并后的推理内容（同一段 reasoning 的多个 chunk 合并为一行） | `type`, `content`, 可选 `conversation_id` / `thread_id` / `task_id` / `agent_name` |
+| **message_block** | 合并后的消息内容（同一段 message_chunk 的多个 chunk 合并为一行，按 `item_id` 分段） | `type`, `content`, `conversation_id`, `thread_id`, `task_id`, `agent_name`, `item_id` |
+| **design_super_agent_outcome** | §2 SuperAgent 意图分流结果 | `type`, `decision`, `answer_content`, `enriched_query`, `reason` |
+| **design_plan_created** | §3 Plan 创建与任务列表 | `type`, `plan_id`, `orig_query`, `guidance_message`, `tasks_summary`（JSON 数组字符串） |
+| **design_plan_require_user_input** | §5 Human-in-the-Loop 需用户补全 | `type`, `prompt`, `conversation_id` |
+| **design_task_started** | §6 单任务开始执行 | `type`, `task_id`, `agent_name`, `conversation_id` |
+| **design_task_completed** | §6 单任务执行完成 | `type`, `task_id`, `agent_name`, `conversation_id` |
+| **event + data** | 原始流式事件（如 `message_chunk`、`tool_call_started`、`tool_call_completed`、`super_agent_outcome`、`plan_created` 等） | `event`, `data`（含 `conversation_id`、`thread_id`、`payload`、`metadata` 等） |
+| **error** | 请求处理异常 | `type`, `error` |
+| **session_end** | 会话结束 | `type`, `ts` |
+
+- `design_*` 行与上文各节一一对应，便于按「意图分流 / 任务拆解 / 需用户输入 / 任务执行」等关键点查看。
+- 原始事件行保留完整 `event` 与 `data`，用于细粒度分析。
+
+### 8.4 查看方式
+
+- 只看设计文档中的关键点：  
+  `grep "design_" reasoning_logs/reasoning_*.log`
+- 只看 SuperAgent 分流结果：  
+  `grep "design_super_agent_outcome" reasoning_logs/reasoning_*.log`
+- 只看 Plan 与任务列表：  
+  `grep "design_plan_created" reasoning_logs/reasoning_*.log`
+- 只看需用户输入：  
+  `grep "design_plan_require_user_input" reasoning_logs/reasoning_*.log`
+- 只看任务开始/完成：  
+  `grep "design_task_started\|design_task_completed" reasoning_logs/reasoning_*.log`

@@ -606,6 +606,7 @@ class ModelFactory:
         "siliconflow": SiliconFlowProvider,
         "openai": OpenAIProvider,
         "openai-compatible": OpenAICompatibleProvider,
+        "opencode": OpenAICompatibleProvider,  # free tier from my_opencode (api_key "public")
         "deepseek": DeepSeekProvider,
         "dashscope": DashScopeProvider,
         "ollama": OllamaProvider,

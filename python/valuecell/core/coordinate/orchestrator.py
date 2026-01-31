@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import AsyncGenerator, Dict, Optional
 
 from loguru import logger
@@ -362,6 +363,17 @@ class AgentOrchestrator:
                     reason="No outcome received from SuperAgent",
                 )
 
+            # Emit super_agent_outcome for reasoning log (design doc)
+            super_outcome_resp = self.event_service.factory.super_agent_outcome(
+                conversation_id,
+                thread_id,
+                decision=super_outcome.decision.value,
+                answer_content=super_outcome.answer_content,
+                enriched_query=super_outcome.enriched_query,
+                reason=super_outcome.reason,
+            )
+            yield await self.event_service.emit(super_outcome_resp)
+
             if super_outcome.answer_content:
                 ans = self.event_service.factory.message_response_general(
                     StreamResponseEvent.MESSAGE_CHUNK,
@@ -486,6 +498,30 @@ class AgentOrchestrator:
         # Planning completed, execute plan
         plan: "ExecutionPlan" = await planning_task
 
+        # Emit plan_created for reasoning log (design doc)
+        tasks_summary = json.dumps(
+            [
+                {
+                    "task_id": getattr(t, "task_id", ""),
+                    "title": getattr(t, "title", ""),
+                    "query": getattr(t, "query", ""),
+                    "agent_name": getattr(t, "agent_name", ""),
+                    "pattern": getattr(getattr(t, "pattern", None), "value", ""),
+                }
+                for t in getattr(plan, "tasks", [])
+            ],
+            ensure_ascii=False,
+        )
+        plan_created_resp = self.event_service.factory.plan_created(
+            conversation_id,
+            thread_id,
+            plan_id=getattr(plan, "plan_id", ""),
+            orig_query=getattr(plan, "orig_query", ""),
+            tasks_summary=tasks_summary,
+            guidance_message=getattr(plan, "guidance_message", None),
+        )
+        yield await self.event_service.emit(plan_created_resp)
+
         yield await self.event_service.emit(
             self.event_service.factory.tool_call(
                 conversation_id,
@@ -569,6 +605,30 @@ class AgentOrchestrator:
         # Planning completed, execute plan and clean up context
         plan = await planning_task
         del self._execution_contexts[conversation_id]
+
+        # Emit plan_created for reasoning log (design doc)
+        tasks_summary_resume = json.dumps(
+            [
+                {
+                    "task_id": getattr(t, "task_id", ""),
+                    "title": getattr(t, "title", ""),
+                    "query": getattr(t, "query", ""),
+                    "agent_name": getattr(t, "agent_name", ""),
+                    "pattern": getattr(getattr(t, "pattern", None), "value", ""),
+                }
+                for t in getattr(plan, "tasks", [])
+            ],
+            ensure_ascii=False,
+        )
+        plan_created_resp_resume = self.event_service.factory.plan_created(
+            conversation_id,
+            thread_id,
+            plan_id=getattr(plan, "plan_id", ""),
+            orig_query=getattr(plan, "orig_query", ""),
+            tasks_summary=tasks_summary_resume,
+            guidance_message=getattr(plan, "guidance_message", None),
+        )
+        yield await self.event_service.emit(plan_created_resp_resume)
 
         # If this conversation was just created (tracked in context), set its title once.
         if getattr(plan, "tasks", None):

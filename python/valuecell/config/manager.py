@@ -103,61 +103,17 @@ class ConfigManager:
     @property
     def primary_provider(self) -> str:
         """
-        Get primary model provider with auto-detection
+        Get primary model provider. Default in code: opencode (YAML unchanged).
 
         Priority:
         1. PRIMARY_PROVIDER env var (explicit override)
-        2. Auto-detect based on available API keys
-        3. Config file default
+        2. Code default "opencode"
         """
-        # 1. Explicit environment variable (highest priority)
         env_provider = os.getenv("PRIMARY_PROVIDER")
         if env_provider:
             logger.debug(f"Using provider from PRIMARY_PROVIDER: {env_provider}")
             return env_provider
-
-        # 2. Auto-detect based on available API keys
-        # Check if auto-detection is enabled (default: true)
-        auto_detect = os.getenv("AUTO_DETECT_PROVIDER", "true").lower() in (
-            "true",
-            "yes",
-            "1",
-        )
-
-        if auto_detect:
-            enabled_providers = self.get_enabled_providers()
-            if enabled_providers:
-                # Priority order for auto-selection
-                preferred_order = [
-                    "openrouter",
-                    "siliconflow",
-                    "google",
-                    "openai",
-                    "openai-compatible",
-                    "azure",
-                    "ollama",
-                ]
-
-                for preferred in preferred_order:
-                    if preferred in enabled_providers:
-                        logger.info(
-                            f"Auto-selected provider: {preferred} "
-                            f"(API key detected, available providers: {enabled_providers})"
-                        )
-                        return preferred
-
-                # Fallback to first enabled provider if none in preferred list
-                selected = enabled_providers[0]
-                logger.info(
-                    f"Auto-selected provider: {selected} "
-                    f"(first available, all providers: {enabled_providers})"
-                )
-                return selected
-
-        # 3. Config file default
-        default = self._config.get("models", {}).get("primary_provider", "openrouter")
-        logger.debug(f"Using default provider from config: {default}")
-        return default
+        return "opencode"
 
     @property
     def fallback_providers(self) -> List[str]:
@@ -216,6 +172,9 @@ class ConfigManager:
         # Get API key from environment
         api_key_env = connection.get("api_key_env")
         api_key = os.getenv(api_key_env) if api_key_env else None
+        # OpenCode Zen (opencode.ai/zen/v1): accepts "public" for free tier when no key set
+        if provider_name == "opencode" and not api_key:
+            api_key = "public"
 
         # Get endpoint for Azure
         endpoint_env = connection.get("endpoint_env")
@@ -370,8 +329,8 @@ class ConfigManager:
             if not provider_config or not provider_config.enabled:
                 continue
 
-            # Check if API key is available (ollama doesn't need one)
-            if provider_name == "ollama" or provider_config.api_key:
+            # Check if API key is available (ollama doesn't need one; opencode uses "public" when unset)
+            if provider_name == "ollama" or provider_name == "opencode" or provider_config.api_key:
                 enabled.append(provider_name)
 
         return enabled
@@ -394,8 +353,8 @@ class ConfigManager:
         if not provider_config.enabled:
             return False, f"Provider '{provider_name}' is disabled in config"
 
-        # Check API key (except for ollama)
-        if provider_name != "ollama" and not provider_config.api_key:
+        # Check API key (except for ollama and opencode; opencode Zen uses "public" when unset)
+        if provider_name not in ("ollama", "opencode") and not provider_config.api_key:
             # Get the env var name for helpful error message
             provider_data = self.loader.load_provider_config(provider_name)
             api_key_env = provider_data.get("connection", {}).get("api_key_env")

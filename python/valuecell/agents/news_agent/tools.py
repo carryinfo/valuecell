@@ -8,15 +8,16 @@ from agno.agent import Agent
 from loguru import logger
 
 from valuecell.adapters.models import create_model
+from valuecell.utils.model import get_model_for_agent
 
 
 async def web_search(query: str) -> str:
     """Search web for the given query and return a summary of the top results.
 
-    This function uses the centralized configuration system to create model instances.
-    It supports multiple search providers:
-    - Google (Gemini with search enabled) - when WEB_SEARCH_PROVIDER=google and GOOGLE_API_KEY is set
-    - Perplexity (via OpenRouter) - default fallback
+    Uses the News Agent's configured model (e.g. opencode, openrouter, google)
+    so you only need the API keys you've set in config/env.
+    - Google (Gemini with search grounding) when WEB_SEARCH_PROVIDER=google and GOOGLE_API_KEY is set
+    - Otherwise uses news_agent's primary model from config (e.g. opencode/gpt-5-nano)
 
     Args:
         query: The search query string.
@@ -30,13 +31,8 @@ async def web_search(query: str) -> str:
     ):
         return await _web_search_google(query)
 
-    # Use Perplexity Sonar via OpenRouter for web search
-    # Perplexity models are optimized for web search and real-time information
-    model = create_model(
-        provider="openrouter",
-        model_id="perplexity/sonar",
-        max_tokens=None,
-    )
+    # Use News Agent's configured model (from configs/agents/news_agent.yaml)
+    model = get_model_for_agent("news_agent")
     response = await Agent(model=model).arun(query)
     return response.content
 

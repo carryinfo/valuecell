@@ -42,6 +42,8 @@ class SystemResponseEvent(str, Enum):
     THREAD_STARTED = "thread_started"
     PLAN_REQUIRE_USER_INPUT = "plan_require_user_input"
     PLAN_FAILED = "plan_failed"
+    PLAN_CREATED = "plan_created"
+    SUPER_AGENT_OUTCOME = "super_agent_outcome"
     SYSTEM_FAILED = "system_failed"
     DONE = "done"
 
@@ -408,6 +410,30 @@ class PlanFailedResponse(BaseResponse):
         SystemResponseEvent.PLAN_FAILED, description="The event type of the response"
     )
     data: UnifiedResponseData = Field(..., description="The plan data payload")
+
+
+class SuperAgentOutcomeResponse(BaseResponse):
+    """Response carrying SuperAgent decision (design doc: intent triage)."""
+
+    event: Literal[SystemResponseEvent.SUPER_AGENT_OUTCOME] = Field(
+        SystemResponseEvent.SUPER_AGENT_OUTCOME,
+        description="SuperAgent decision: answer or handoff_to_planner",
+    )
+    data: UnifiedResponseData = Field(
+        ..., description="decision, answer_content, enriched_query, reason"
+    )
+
+
+class PlanCreatedResponse(BaseResponse):
+    """Response carrying ExecutionPlan summary (design doc: plan created)."""
+
+    event: Literal[SystemResponseEvent.PLAN_CREATED] = Field(
+        SystemResponseEvent.PLAN_CREATED,
+        description="Plan created with plan_id, tasks, guidance_message",
+    )
+    data: UnifiedResponseData = Field(
+        ..., description="plan_id, orig_query, tasks, guidance_message"
+    )
 
 
 class TaskStartedResponse(BaseResponse):

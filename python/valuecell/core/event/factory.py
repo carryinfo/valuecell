@@ -14,12 +14,14 @@ from valuecell.core.types import (
     DoneResponse,
     MessageResponse,
     NotifyResponseEvent,
+    PlanCreatedResponse,
     PlanFailedResponse,
     PlanRequireUserInputResponse,
     ReasoningResponse,
     Role,
     ScheduledTaskComponentContent,
     StreamResponseEvent,
+    SuperAgentOutcomeResponse,
     SystemFailedResponse,
     SystemResponseEvent,
     TaskCompletedResponse,
@@ -158,6 +160,14 @@ class ResponseFactory:
         if ev == SystemResponseEvent.PLAN_REQUIRE_USER_INPUT:
             payload = parse_payload_as(BaseResponseDataPayload)
             return PlanRequireUserInputResponse(data=make_data(payload))
+
+        if ev == SystemResponseEvent.SUPER_AGENT_OUTCOME:
+            payload = parse_payload_as(BaseResponseDataPayload)
+            return SuperAgentOutcomeResponse(data=make_data(payload))
+
+        if ev == SystemResponseEvent.PLAN_CREATED:
+            payload = parse_payload_as(BaseResponseDataPayload)
+            return PlanCreatedResponse(data=make_data(payload))
 
         # ----- Stream/notify/common events -----
         if ev == StreamResponseEvent.MESSAGE_CHUNK:
@@ -318,6 +328,56 @@ class ResponseFactory:
                 thread_id=thread_id,
                 payload=BaseResponseDataPayload(content=content),
                 role=Role.SYSTEM,
+            )
+        )
+
+    def super_agent_outcome(
+        self,
+        conversation_id: str,
+        thread_id: str,
+        decision: str,
+        answer_content: Optional[str] = None,
+        enriched_query: Optional[str] = None,
+        reason: Optional[str] = None,
+    ) -> SuperAgentOutcomeResponse:
+        """Build SuperAgentOutcomeResponse (design doc: intent triage)."""
+        meta: dict = {"decision": decision}
+        if answer_content is not None:
+            meta["answer_content"] = answer_content
+        if enriched_query is not None:
+            meta["enriched_query"] = enriched_query
+        if reason is not None:
+            meta["reason"] = reason
+        return SuperAgentOutcomeResponse(
+            data=UnifiedResponseData(
+                conversation_id=conversation_id,
+                thread_id=thread_id,
+                payload=BaseResponseDataPayload(content=answer_content or ""),
+                role=Role.AGENT,
+                metadata=meta,
+            )
+        )
+
+    def plan_created(
+        self,
+        conversation_id: str,
+        thread_id: str,
+        plan_id: str,
+        orig_query: str,
+        tasks_summary: str,
+        guidance_message: Optional[str] = None,
+    ) -> PlanCreatedResponse:
+        """Build PlanCreatedResponse (design doc: plan created). tasks_summary: JSON array of {task_id, title, query, agent_name, pattern}."""
+        meta: dict = {"plan_id": plan_id, "orig_query": orig_query}
+        if guidance_message is not None:
+            meta["guidance_message"] = guidance_message
+        return PlanCreatedResponse(
+            data=UnifiedResponseData(
+                conversation_id=conversation_id,
+                thread_id=thread_id,
+                payload=BaseResponseDataPayload(content=tasks_summary),
+                role=Role.SYSTEM,
+                metadata=meta,
             )
         )
 
